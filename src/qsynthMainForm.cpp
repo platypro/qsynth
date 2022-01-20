@@ -335,6 +335,20 @@ static void qsynth_midi_event ( qsynthEngine *pEngine,
 		fprintf(stderr, "Type=%03d (0x%02x) Chan=%02d Key=%03d (0x%02x) Val=%03d (0x%02x).\n",
 			iType, iType, iChan, iKey, iKey, iVal, iVal);
 	#endif
+
+		//
+		// Keyboard curve code
+		// 
+		if((fluid_midi_event_get_type(pMidiEvent) & 0xF0) == 0x90)
+		{
+			int iVal = fluid_midi_event_get_value(pMidiEvent);
+			iVal += 50; if(iVal > 127) iVal = 127;
+			fluid_midi_event_set_value(pMidiEvent, iVal);
+		}
+		//
+		//
+		//
+
 		if (iChan >= 0 && iChan < g_iMidiChannels) {
 			switch (::fluid_midi_event_get_type(pMidiEvent)) {
 			case QSYNTH_MIDI_CONTROL_CHANGE: {
