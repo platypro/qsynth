@@ -1,7 +1,7 @@
 // qsynth.h
 //
 /****************************************************************************
-   Copyright (C) 2003-2021, rncbc aka Rui Nuno Capela. All rights reserved.
+   Copyright (C) 2003-2022, rncbc aka Rui Nuno Capela. All rights reserved.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -78,6 +78,14 @@ public:
 	// and raise its proper main widget...
 	bool setup();
 
+	void loadTranslations(const QString& sLanguage);
+
+	// Install Prefix Location
+	static QString prefixPath;
+
+	// Translations Location
+	static QString translationsPath;
+
 #if QT_VERSION < QT_VERSION_CHECK(5, 0, 0)
 #ifdef CONFIG_XUNIQUE
 #ifdef CONFIG_X11
@@ -87,6 +95,7 @@ public:
 #endif	// CONFIG_XUNIQUE
 #else
 #ifdef CONFIG_XUNIQUE
+
 protected slots:
 	// Local server slots.
 	void newConnectionSlot();

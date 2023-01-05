@@ -1,7 +1,7 @@
 // qsynthSetupForm.cpp
 //
 /****************************************************************************
-   Copyright (C) 2003-2021, rncbc aka Rui Nuno Capela. All rights reserved.
+   Copyright (C) 2003-2022, rncbc aka Rui Nuno Capela. All rights reserved.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -326,7 +326,7 @@ qsynthSetupForm::qsynthSetupForm ( QWidget *pParent )
 	QObject::connect(m_ui.JackNameComboBox,
 		SIGNAL(editTextChanged(const QString&)),
 		SLOT(settingsChanged()));
-#if defined(__WIN32__) || defined(_WIN32) || defined(WIN32)
+#if defined(Q_OS_WINDOWS)
 	QObject::connect(m_ui.WasapiExclusiveCheckBox,
 		SIGNAL(stateChanged(int)),
 		SLOT(settingsChanged()));
@@ -502,7 +502,7 @@ void qsynthSetupForm::setup ( qsynthOptions *pOptions, qsynthEngine *pEngine, bo
 	m_ui.PolyphonySpinBox->setValue(m_pSetup->iPolyphony);
 	m_ui.JackMultiCheckBox->setChecked(m_pSetup->bJackMulti);
 	m_ui.JackAutoConnectCheckBox->setChecked(m_pSetup->bJackAutoConnect);
-#if defined(__WIN32__) || defined(_WIN32) || defined(WIN32)
+#if defined(Q_OS_WINDOWS)
 	m_ui.WasapiExclusiveCheckBox->setChecked(m_pSetup->bWasapiExclusive);
 #else
 	m_ui.WasapiExclusiveCheckBox->hide();
@@ -523,7 +523,7 @@ void qsynthSetupForm::setup ( qsynthOptions *pOptions, qsynthEngine *pEngine, bo
 	if (pEngine->pSynth) {
 		// Load soundfont view from actual synth stack...
 		int cSoundFonts = ::fluid_synth_sfcount(pEngine->pSynth);
-		for (int i = cSoundFonts - 1; i >= 0; i--) {
+		for (int i = cSoundFonts - 1; i >= 0; --i) {
 			fluid_sfont_t *pSoundFont = ::fluid_synth_get_sfont(pEngine->pSynth, i);
 			if (pSoundFont) {
 				pItem = new QTreeWidgetItem(m_ui.SoundFontListView, pItem);
@@ -614,7 +614,7 @@ void qsynthSetupForm::accept (void)
 		m_pSetup->bJackMulti       = m_ui.JackMultiCheckBox->isChecked();
 		m_pSetup->sJackName        = m_ui.JackNameComboBox->currentText();
 		m_pSetup->bJackAutoConnect = m_ui.JackAutoConnectCheckBox->isChecked();
-	#if defined(__WIN32__) || defined(_WIN32) || defined(WIN32)
+	#if defined(Q_OS_WINDOWS)
 		m_pSetup->bWasapiExclusive = m_ui.WasapiExclusiveCheckBox->isChecked();
 	#endif
 		// Reset dirty flag.
@@ -782,7 +782,7 @@ void qsynthSetupForm::stabilizeForm (void)
 #endif
 	const bool bJackEnabled = (m_ui.AudioDriverComboBox->currentText() == "jack");
 	const bool bJackMultiEnabled = m_ui.JackMultiCheckBox->isChecked();
-#if defined(__WIN32__) || defined(_WIN32) || defined(WIN32)
+#if defined(Q_OS_WINDOWS)
 	const bool bWasapiEnabled = (m_ui.AudioDriverComboBox->currentText() == "wasapi");
 #endif
 	m_ui.AudioDeviceTextLabel->setEnabled(!bJackEnabled);
@@ -791,7 +791,7 @@ void qsynthSetupForm::stabilizeForm (void)
 	m_ui.JackAutoConnectCheckBox->setEnabled(bJackEnabled);
 	m_ui.JackNameTextLabel->setEnabled(bJackEnabled);
 	m_ui.JackNameComboBox->setEnabled(bJackEnabled);
-#if defined(__WIN32__) || defined(_WIN32) || defined(WIN32)
+#if defined(Q_OS_WINDOWS)
 	m_ui.WasapiExclusiveCheckBox->setEnabled(bWasapiEnabled);
 #endif
 	if (bJackEnabled) {
@@ -899,7 +899,12 @@ void qsynthSetupForm::openSoundFont (void)
 {
 	QStringList soundfonts = QFileDialog::getOpenFileNames(this,
 		tr("Soundfont files"), m_pOptions->sSoundFontDir,
-		tr("Soundfont files") + " (*.sf2 *.SF2 *.sf3 *.SF3)");
+		tr("Soundfont files") + " (*.sf2 *.SF2 *.sf3 *.SF3 *.dls *.DLS);;" +
+		tr("All files") + " (*.*)");
+
+/* Note: Qt's own File Dialog file filters are case insensitive, but when
+   using platform native dialogs this may not be true, like for instance:
+   QGtk3FileDialogHelper; see: https://bugreports.qt.io/browse/QTBUG-51712 */
 
 	QTreeWidgetItem *pItem = nullptr;
 

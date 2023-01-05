@@ -1,7 +1,7 @@
 cmake_minimum_required (VERSION 3.15)
 
 project (qsynth
-  VERSION 0.9.5
+  VERSION 0.9.9
   DESCRIPTION "A fluidsynth Qt GUI Interface"
   LANGUAGES C CXX)
 
@@ -40,9 +40,6 @@ set (PACKAGE_BUGREPORT "rncbc@rncbc.org")
 set (PACKAGE_STRING "${PACKAGE_NAME} ${PACKAGE_VERSION}")
 set (PACKAGE_TARNAME "qsynth")
 
-set (ac_version "${PROJECT_VERSION}")
-set (ac_prefix "${CMAKE_INSTALL_PREFIX}")
-
 set (CONFIG_BUILD_VERSION "${PACKAGE_VERSION}")
 
 if (CONFIG_DEBUG)
@@ -62,7 +59,7 @@ set (CONFIG_PREFIX "${CMAKE_INSTALL_PREFIX}")
 include (GNUInstallDirs)
 set (CONFIG_BINDIR  "${CONFIG_PREFIX}/${CMAKE_INSTALL_BINDIR}")
 set (CONFIG_LIBDIR  "${CONFIG_PREFIX}/${CMAKE_INSTALL_LIBDIR}")
-set (CONFIG_DATADIR "${CONFIG_PREFIX}/${CMAKE_INSTALL_DATADIR}")
+set (CONFIG_DATADIR "/${CMAKE_INSTALL_DATADIR}")
 set (CONFIG_MANDIR  "${CONFIG_PREFIX}/${CMAKE_INSTALL_MANDIR}")
 
 
@@ -87,6 +84,8 @@ option (CONFIG_GRADIENT "Enable gradient eye-candy (default=yes)" 1)
 # Enable debugger stack-trace option (assumes --enable-debug).
 option (CONFIG_STACKTRACE "Enable debugger stack-trace (default=no)" 0)
 
+# Enable Wayland support option.
+option (CONFIG_WAYLAND "Enable Wayland support (EXPERIMENTAL) (default=no)" 0)
 
 # Enable Qt6 build preference.
 option (CONFIG_QT6 "Enable Qt6 build (default=yes)" 1)
@@ -111,7 +110,7 @@ else ()
   find_package (QT QUIET NAMES Qt5)
 endif ()
 
-find_package (Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Core Gui Widgets)
+find_package (Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Core Gui Widgets Svg)
 
 if (CONFIG_XUNIQUE)
   find_package (Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Network)
@@ -222,10 +221,6 @@ endif ()
 
 add_subdirectory (src)
 
-configure_file (qsynth.spec.in qsynth.spec IMMEDIATE @ONLY)
-
-install (FILES qsynth.1 DESTINATION ${CMAKE_INSTALL_MANDIR}/man1)
-install (FILES qsynth.fr.1 DESTINATION ${CMAKE_INSTALL_MANDIR}/fr/man1 RENAME qsynth.1)
 
 # Configuration status
 macro (SHOW_OPTION text value)

@@ -1,7 +1,7 @@
 // qsynthOptions.h
 //
 /****************************************************************************
-   Copyright (C) 2003-2021, rncbc aka Rui Nuno Capela. All rights reserved.
+   Copyright (C) 2003-2022, rncbc aka Rui Nuno Capela. All rights reserved.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -69,8 +69,12 @@ public:
 
 	// Command line arguments parser.
 	bool parse_args(const QStringList& args);
+#if QT_VERSION >= QT_VERSION_CHECK(5, 2, 0)
+	void show_error(const QString& msg);
+#else
 	// Command line usage helper.
-	void print_usage(const QString& arg0);
+ 	void print_usage(const QString& arg0);
+#endif
 
 	// Default instance setup accessor.
 	qsynthSetup *defaultSetup();
@@ -101,6 +105,9 @@ public:
 
 	// Available custom engines list.
 	QStringList engines;
+
+	// Language choices
+	QString sLanguage;
 
 	// Engine management methods.
 	void newEngine(qsynthEngine *pEngine);

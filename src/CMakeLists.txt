@@ -90,10 +90,11 @@ if (WIN32)
                  ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}.rc IMMEDIATE @ONLY)
   set (RC_FILE ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}.rc)
   set (RES_FILE ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}.res.obj)
-  find_program (WINDRES_EXECUTABLE NAMES windres mingw32-windres i686-mingw32-windres)
   if (MINGW)
-    exec_program (${WINDRES_EXECUTABLE}
-      ARGS "-i ${RC_FILE} -o ${RES_FILE} --include-dir=${CMAKE_CURRENT_SOURCE_DIR}/images")
+	get_filename_component (compiler_location "${CMAKE_CXX_COMPILER}" DIRECTORY)
+    find_program (WINDRES_EXECUTABLE NAMES windres mingw32-windres i686-mingw32-windres PATHS ${compiler_location} NO_DEFAULT_PATH)
+    execute_process (COMMAND ${WINDRES_EXECUTABLE} -i ${RC_FILE} -o ${RES_FILE} --include-dir=${CMAKE_CURRENT_SOURCE_DIR}/images/
+		WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
     list (APPEND SOURCES ${RES_FILE})
   else ()
     list (APPEND SOURCES ${RC_FILE})
@@ -125,8 +126,9 @@ add_executable (${PROJECT_NAME}
 
 # Add some debugger flags.
 if (CONFIG_DEBUG AND UNIX AND NOT APPLE)
-  target_compile_options (${PROJECT_NAME} PRIVATE -g -fsanitize=address -fno-omit-frame-pointer)
-  target_link_libraries (${PROJECT_NAME} PRIVATE asan)
+  set (CONFIG_DEBUG_OPTIONS -g -fsanitize=address -fno-omit-frame-pointer)
+  target_compile_options (${PROJECT_NAME} PRIVATE ${CONFIG_DEBUG_OPTIONS})
+  target_link_options (${PROJECT_NAME} PRIVATE ${CONFIG_DEBUG_OPTIONS})
 endif ()
 
 set_target_properties (${PROJECT_NAME} PROPERTIES CXX_STANDARD 17)
@@ -148,7 +150,7 @@ if (APPLE)
     MACOSX_BUNDLE_COPYRIGHT "Copyright © 2003-2021, Rui Nuno Capela. All rights reserved.")
 endif ()
 
-target_link_libraries (${PROJECT_NAME} PRIVATE Qt${QT_VERSION_MAJOR}::Widgets)
+target_link_libraries (${PROJECT_NAME} PRIVATE Qt${QT_VERSION_MAJOR}::Widgets Qt${QT_VERSION_MAJOR}::Svg)
 
 if (CONFIG_XUNIQUE)
   target_link_libraries (${PROJECT_NAME} PRIVATE Qt${QT_VERSION_MAJOR}::Network)
@@ -165,17 +167,23 @@ endif ()
 
 if (UNIX AND NOT APPLE)
   install (TARGETS ${PROJECT_NAME} RUNTIME
-     DESTINATION ${CMAKE_INSTALL_BINDIR})
+    DESTINATION ${CMAKE_INSTALL_BINDIR})
   install (FILES ${QM_FILES}
-     DESTINATION ${CMAKE_INSTALL_DATADIR}/${PROJECT_NAME}/translations)
-  install (FILES org.rncbc.${PROJECT_NAME}.desktop
-     DESTINATION ${CMAKE_INSTALL_DATADIR}/applications)
+    DESTINATION ${CMAKE_INSTALL_DATADIR}/${PROJECT_NAME}/translations)
   install (FILES images/${PROJECT_NAME}.png
-     DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/32x32/apps)
+    RENAME org.rncbc.${PROJECT_NAME}.png
+    DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/32x32/apps)
   install (FILES images/${PROJECT_NAME}.svg
-     DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/scalable/apps)
-  install (FILES appdata/org.rncbc.${PROJECT_NAME}.xml
-     DESTINATION ${CMAKE_INSTALL_DATADIR}/metainfo)
+    RENAME org.rncbc.${PROJECT_NAME}.svg
+    DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/scalable/apps)
+  install (FILES appdata/org.rncbc.${PROJECT_NAME}.desktop
+    DESTINATION ${CMAKE_INSTALL_DATADIR}/applications)
+  install (FILES appdata/org.rncbc.${PROJECT_NAME}.metainfo.xml
+    DESTINATION ${CMAKE_INSTALL_DATADIR}/metainfo)
+  install (FILES man1/${PROJECT_NAME}.1
+    DESTINATION ${CMAKE_INSTALL_MANDIR}/man1)
+  install (FILES man1/${PROJECT_NAME}.fr.1
+    DESTINATION ${CMAKE_INSTALL_MANDIR}/fr/man1 RENAME ${PROJECT_NAME}.1)
 endif ()
 
 if (WIN32)

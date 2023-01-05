@@ -4,6 +4,34 @@ Qsynth - A fluidsynth Qt GUI Interface
 ChangeLog
 
 
+0.9.9  2022-12-28  An End-of-Year'22 Release.
+
+- Just bumping into the next develop cycle/season.
+
+
+0.9.8  2022-10-03  An Early-Autumn'22 Release.
+
+- Add current system user-name to the singleton/unique application
+  instance identifier.
+
+
+0.9.7  2022-04-02  A Spring'22 Release.
+
+- Main application icon is now presented in scalable format (SVG).
+
+
+0.9.6  2022-02-12  A Mid-Winter'22 Release.
+
+- Migrated command line parsing to QCommandLineParser/Option
+  (Qt >= 5.2; by Pedro Lopez-Cabanillas).
+
+- New option to change the UI language translation.
+
+- Added DLS file type to the soundfonts selection dialog.
+
+- Fixed translations path to be relative to application runtime.
+
+
 0.9.5  2022-01-09  A Winter'22 Release.
 
 - Dropped autotools (autoconf, automake, etc.) build system.

@@ -1,7 +1,7 @@
 // qsynth.cpp
 //
 /****************************************************************************
-   Copyright (C) 2003-2021, rncbc aka Rui Nuno Capela. All rights reserved.
+   Copyright (C) 2003-2022, rncbc aka Rui Nuno Capela. All rights reserved.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -46,12 +46,16 @@ const WindowFlags WindowCloseButtonHint = WindowFlags(0x08000000);
 #define CONFIG_PREFIX	"/usr/local"
 #endif
 
+#ifndef CONFIG_BINDIR
+#define CONFIG_BINDIR	CONFIG_PREFIX "/bin"
+#endif
+
 #ifndef CONFIG_DATADIR
 #define CONFIG_DATADIR	CONFIG_PREFIX "/share"
 #endif
 
 #ifndef CONFIG_LIBDIR
-#if defined(__x86_64__)
+#if defined(Q_PROCESSOR_X86_64)
 #define CONFIG_LIBDIR  CONFIG_PREFIX "/lib64"
 #else
 #define CONFIG_LIBDIR  CONFIG_PREFIX "/lib"
@@ -93,6 +97,11 @@ const WindowFlags WindowCloseButtonHint = WindowFlags(0x08000000);
 
 #endif	// CONFIG_XUNIQUE
 
+// Install Prefix Location
+QString qsynthApplication::prefixPath;
+
+// Translations Location
+QString qsynthApplication::translationsPath;
 
 // Constructor.
 qsynthApplication::qsynthApplication ( int& argc, char **argv )
@@ -103,51 +112,28 @@ qsynthApplication::qsynthApplication ( int& argc, char **argv )
 	QApplication::setApplicationName(QSYNTH_TITLE);
 	QApplication::setApplicationDisplayName(QSYNTH_TITLE);
 	//	QSYNTH_TITLE " - " + QObject::tr(QSYNTH_SUBTITLE));
+#if QT_VERSION >= QT_VERSION_CHECK(5, 7, 0)
+	QApplication::setDesktopFileName(
+		QString("org.rncbc.%1").arg(PACKAGE_TARNAME));
 #endif
-	// Load translation support.
-	QLocale loc;
-	if (loc.language() != QLocale::C) {
-		// Try own Qt translation...
-		m_pQtTranslator = new QTranslator(this);
-		QString sLocName = "qt_" + loc.name();
-	#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
-		QString sLocPath = QLibraryInfo::path(QLibraryInfo::TranslationsPath);
-	#else
-		QString sLocPath = QLibraryInfo::location(QLibraryInfo::TranslationsPath);
-	#endif
-		if (m_pQtTranslator->load(sLocName, sLocPath)) {
-			QApplication::installTranslator(m_pQtTranslator);
-		} else {
-			delete m_pQtTranslator;
-			m_pQtTranslator = nullptr;
-		#ifdef CONFIG_DEBUG
-			qWarning("Warning: no translation found for '%s' locale: %s/%s.qm",
-				loc.name().toLocal8Bit().data(),
-				sLocPath.toLocal8Bit().data(),
-				sLocName.toLocal8Bit().data());
-		#endif
-		}
-		// Try own application translation...
-		m_pMyTranslator = new QTranslator(this);
-		sLocName = "qsynth_" + loc.name();
-		if (m_pMyTranslator->load(sLocName, sLocPath)) {
-			QApplication::installTranslator(m_pMyTranslator);
-		} else {
-			sLocPath = CONFIG_DATADIR "/qsynth/translations";
-			if (m_pMyTranslator->load(sLocName, sLocPath)) {
-				QApplication::installTranslator(m_pMyTranslator);
-			} else {
-				delete m_pMyTranslator;
-				m_pMyTranslator = nullptr;
-			#ifdef CONFIG_DEBUG
-				qWarning("Warning: no translation found for '%s' locale: %s/%s.qm",
-					loc.name().toLocal8Bit().data(),
-					sLocPath.toLocal8Bit().data(),
-					sLocName.toLocal8Bit().data());
-			#endif
-			}
-		}
-	}
+	QString sVersion(CONFIG_BUILD_VERSION);
+	sVersion += '\n';
+	sVersion += QString("Qt: %1").arg(qVersion());
+#if defined(QT_STATIC)
+	sVersion += "-static";
+#endif
+	sVersion += '\n';
+	sVersion += QString("FluidSynth: %1\n")
+		.arg(::fluid_version_str());
+	QApplication::setApplicationVersion(sVersion);
+#endif
+
+	QDir appDir(QApplication::applicationDirPath());
+#ifndef Q_OS_WINDOWS
+	appDir.cdUp();
+#endif
+	qsynthApplication::prefixPath = appDir.path();
+
 #ifdef CONFIG_XUNIQUE
 #if QT_VERSION < QT_VERSION_CHECK(5, 0, 0)
 #ifdef CONFIG_X11
@@ -184,6 +170,68 @@ qsynthApplication::~qsynthApplication (void)
 }
 
 
+// Load translation support.
+void qsynthApplication::loadTranslations(const QString& sLanguage)
+{
+	QLocale loc;
+	if (!sLanguage.isEmpty()) {
+		loc = QLocale(sLanguage);
+	}
+
+	QString sLocPath = qsynthApplication::prefixPath;
+#if defined(Q_OS_WINDOWS) || defined(Q_OS_MACOS)
+	sLocPath.append("/translations");
+#else
+	sLocPath.append(CONFIG_DATADIR "/qsynth/translations");
+#endif
+	qsynthApplication::translationsPath = sLocPath;
+
+	if (loc.language() != QLocale::C) {
+		// Try own Qt translation...
+		m_pQtTranslator = new QTranslator(this);
+		QString sLocName = "qt";
+	#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+		sLocPath = QLibraryInfo::path(QLibraryInfo::TranslationsPath);
+	#else
+		sLocPath = QLibraryInfo::location(QLibraryInfo::TranslationsPath);
+	#endif
+// https://www.kdab.com/fixing-a-common-antipattern-when-loading-translations-in-qt/
+		if (m_pQtTranslator->load(loc, sLocName, "_", sLocPath)) {
+			QApplication::installTranslator(m_pQtTranslator);
+		} else {
+			delete m_pQtTranslator;
+			m_pQtTranslator = nullptr;
+		#ifdef CONFIG_DEBUG
+			qWarning() << "Warning: no translation found for"
+				<< loc.name()
+				<< "path:" << sLocPath
+				<< "name:" << sLocName;
+		#endif
+		}
+		// Try own application translation...
+		m_pMyTranslator = new QTranslator(this);
+		sLocName = "qsynth";
+		if (m_pMyTranslator->load(loc, sLocName, "_", sLocPath)) {
+			QApplication::installTranslator(m_pMyTranslator);
+		} else {
+			sLocPath = qsynthApplication::translationsPath;
+			if (m_pMyTranslator->load(loc, sLocName, "_", sLocPath)) {
+				QApplication::installTranslator(m_pMyTranslator);
+			} else {
+				delete m_pMyTranslator;
+				m_pMyTranslator = nullptr;
+			#ifdef CONFIG_DEBUG
+				qWarning() << "Warning: no translation found for"
+					<< loc.name()
+					<< "path:" << sLocPath
+					<< "name:" << sLocName;
+			#endif
+			}
+		}
+	}
+}
+
+
 // Main application widget accessors.
 void qsynthApplication::setMainWidget ( QWidget *pWidget )
 {
@@ -213,10 +261,17 @@ bool qsynthApplication::setup (void)
 	m_pDisplay = QX11Info::display();
 	if (m_pDisplay) {
 		QString sUnique = QSYNTH_XUNIQUE;
+		QString sUserName = QString::fromUtf8(::getenv("USER"));
+		if (sUserName.isEmpty())
+			sUserName = QString::fromUtf8(::getenv("USERNAME"));
+		if (!sUserName.isEmpty()) {
+			sUnique += ':';
+			sUnique += sUserName;
+		}
 		char szHostName[255];
 		if (::gethostname(szHostName, sizeof(szHostName)) == 0) {
 			sUnique += '@';
-			sUnique += szHostName;
+			sUnique += QString::fromUtf8(szHostName);
 		}
 		m_aUnique = XInternAtom(m_pDisplay, sUnique.toUtf8().constData(), false);
 		XGrabServer(m_pDisplay);
@@ -263,6 +318,13 @@ bool qsynthApplication::setup (void)
 	return false;
 #else
 	m_sUnique = QCoreApplication::applicationName();
+	QString sUserName = QString::fromUtf8(::getenv("USER"));
+	if (sUserName.isEmpty())
+		sUserName = QString::fromUtf8(::getenv("USERNAME"));
+	if (!sUserName.isEmpty()) {
+		m_sUnique += ':';
+		m_sUnique += sUserName;
+	}
 	m_sUnique += '@';
 	m_sUnique += QHostInfo::localHostName();
 #ifdef Q_OS_UNIX
@@ -413,7 +475,7 @@ void qsynthApplication::readyReadSlot (void)
 //
 
 #ifdef CONFIG_STACKTRACE
-#if defined(__GNUC__) && defined(Q_OS_LINUX)
+#if defined(Q_CC_GNU) && defined(Q_OS_LINUX)
 
 #include <stdio.h>
 #include <errno.h>
@@ -474,7 +536,7 @@ int main ( int argc, char **argv )
 {
 	Q_INIT_RESOURCE(qsynth);
 #ifdef CONFIG_STACKTRACE
-#if defined(__GNUC__) && defined(Q_OS_LINUX)
+#if defined(Q_CC_GNU) && defined(Q_OS_LINUX)
 	::signal(SIGILL,  stacktrace);
 	::signal(SIGFPE,  stacktrace);
 	::signal(SIGSEGV, stacktrace);
@@ -482,7 +544,7 @@ int main ( int argc, char **argv )
 	::signal(SIGBUS,  stacktrace);
 #endif
 #endif
-#if defined(Q_OS_LINUX)
+#if defined(Q_OS_LINUX) && !defined(CONFIG_WAYLAND)
 	::setenv("QT_QPA_PLATFORM", "xcb", 0);
 #endif
 #if QT_VERSION >= QT_VERSION_CHECK(5, 6, 0)
@@ -495,6 +557,7 @@ int main ( int argc, char **argv )
 
 	// Construct default settings; override with command line arguments.
 	qsynthOptions options;
+	app.loadTranslations(options.sLanguage);
 	if (!options.parse_args(app.arguments())) {
 		app.quit();
 		return 1;
