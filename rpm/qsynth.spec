@@ -1,7 +1,7 @@
 #
 # spec file for package qsynth
 #
-# Copyright (C) 2003-2022, rncbc aka Rui Nuno Capela. All rights reserved.
+# Copyright (C) 2003-2024, rncbc aka Rui Nuno Capela. All rights reserved.
 #
 # All modifications and additions to the file contributed by third parties
 # remain the property of their copyright owners, unless otherwise agreed
@@ -16,8 +16,8 @@
 #
 
 %define name    qsynth
-%define version 0.9.9
-%define release 53.1
+%define version 0.9.90
+%define release 1.1
 
 %define _prefix	/usr
 
@@ -46,22 +46,24 @@ BuildRoot:	%{_tmppath}/%{name}-%{version}-%{release}-buildroot
 BuildRequires:	coreutils
 BuildRequires:	pkgconfig
 BuildRequires:	glibc-devel
-
-%if %{defined fedora} || 0%{?suse_version} > 1500
-BuildRequires:	gcc-c++ >= 8
-%define CXX		/usr/bin/g++
-%else
-BuildRequires:	gcc8-c++ >= 8
-%define CXX		/usr/bin/g++-8
-%endif
-
 BuildRequires:	cmake >= 3.15
+%if 0%{?sle_version} >= 150200 && 0%{?is_opensuse}
+BuildRequires:	gcc10 >= 10
+BuildRequires:	gcc10-c++ >= 10
+%define _GCC	/usr/bin/gcc-10
+%define _GXX	/usr/bin/g++-10
+%else
+BuildRequires:	gcc >= 10
+BuildRequires:	gcc-c++ >= 10
+%define _GCC	/usr/bin/gcc
+%define _GXX	/usr/bin/g++
+%endif
 %if 0%{qt_major_version} == 6
 %if 0%{?sle_version} == 150200 && 0%{?is_opensuse}
-BuildRequires:	qtbase6-static >= 6.1
-BuildRequires:	qttools6-static
-BuildRequires:	qttranslations6-static
-BuildRequires:	qtsvg6-static
+BuildRequires:	qtbase6.6-static >= 6.6
+BuildRequires:	qttools6.6-static
+BuildRequires:	qttranslations6.6-static
+BuildRequires:	qtsvg6.6-static
 %else
 BuildRequires:	cmake(Qt6LinguistTools)
 BuildRequires:	pkgconfig(Qt6Core)
@@ -78,13 +80,14 @@ BuildRequires:	pkgconfig(Qt5Widgets)
 BuildRequires:	pkgconfig(Qt5Svg)
 BuildRequires:	pkgconfig(Qt5Network)
 %endif
+
 %if %{defined fedora}
 BuildRequires:	jack-audio-connection-kit-devel
-BuildRequires:	alsa-lib-devel
 %else
-BuildRequires:	libjack-devel
-BuildRequires:	alsa-devel
+BuildRequires:	pkgconfig(jack)
 %endif
+BuildRequires:	pkgconfig(alsa)
+
 BuildRequires:	libfluidsynth-devel
 
 %description
@@ -98,9 +101,9 @@ command line softsynths.
 
 %build
 %if 0%{?sle_version} == 150200 && 0%{?is_opensuse}
-source /opt/qt6.4-static/bin/qt6.4-static-env.sh
+source /opt/qt6.6-static/bin/qt6.6-static-env.sh
 %endif
-CXX=%{CXX} \
+CXX=%{_GXX} CC=%{_GCC} \
 cmake -DCMAKE_INSTALL_PREFIX=%{_prefix} -Wno-dev -B build
 cmake --build build %{?_smp_mflags}
 
@@ -113,7 +116,8 @@ cmake --install build
 
 %files
 %defattr(-,root,root)
-%doc README LICENSE TRANSLATORS ChangeLog
+%license LICENSE
+%doc README TRANSLATORS ChangeLog
 #dir %{_datadir}/applications
 %dir %{_datadir}/icons/hicolor
 %dir %{_datadir}/icons/hicolor/32x32
@@ -122,6 +126,7 @@ cmake --install build
 %dir %{_datadir}/icons/hicolor/scalable/apps
 %dir %{_datadir}/%{name}
 %dir %{_datadir}/%{name}/translations
+%dir %{_datadir}/%{name}/palette
 %dir %{_datadir}/metainfo
 #dir %{_datadir}/man
 #dir %{_datadir}/man/man1
@@ -135,8 +140,19 @@ cmake --install build
 %{_datadir}/metainfo/org.rncbc.%{name}.metainfo.xml
 %{_datadir}/man/man1/%{name}.1.gz
 %{_datadir}/man/fr/man1/%{name}.1.gz
+%{_datadir}/%{name}/palette/*.conf
 
 %changelog
+* Wed Apr 10 2024 Rui Nuno Capela <rncbc@rncbc.org> 0.9.90
+- A Spring'24 Release Candidate.
+* Wed Jan 24 2024 Rui Nuno Capela <rncbc@rncbc.org> 0.9.13
+- A Winter'24 Release.
+* Sat Sep  9 2023 Rui Nuno Capela <rncbc@rncbc.org> 0.9.12
+- An End-of-Summer'23 Release.
+* Thu Jun  1 2023 Rui Nuno Capela <rncbc@rncbc.org> 0.9.11
+- A Spring'23 Release.
+* Thu Mar 23 2023 Rui Nuno Capela <rncbc@rncbc.org> 0.9.10
+- An Early-Spring'23 Release.
 * Wed Dec 28 2022 Rui Nuno Capela <rncbc@rncbc.org> 0.9.9
 - An End-of-Year'22 Release.
 * Mon Oct  3 2022 Rui Nuno Capela <rncbc@rncbc.org> 0.9.8

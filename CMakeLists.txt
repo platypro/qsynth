@@ -1,13 +1,19 @@
 cmake_minimum_required (VERSION 3.15)
 
-project (qsynth
-  VERSION 0.9.9
+project (Qsynth
+  VERSION 0.9.90
   DESCRIPTION "A fluidsynth Qt GUI Interface"
+  HOMEPAGE_URL "https://qsynth.sourceforge.io"
   LANGUAGES C CXX)
+
+set (PROJECT_TITLE "${PROJECT_NAME}")
+string (TOLOWER "${PROJECT_TITLE}" PROJECT_NAME)
+
+set (PROJECT_COPYRIGHT "Copyright (C) 2003-2024, rncbc aka Rui Nuno Capela. All rights reserved.")
+set (PROJECT_DOMAIN    "rncbc.org")
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 
-set (CONFIG_VERSION ${PROJECT_VERSION})
 execute_process (
   COMMAND git describe --tags --dirty --abbrev=6
   WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
@@ -15,43 +21,32 @@ execute_process (
   RESULT_VARIABLE GIT_DESCRIBE_RESULT
   OUTPUT_STRIP_TRAILING_WHITESPACE)
 if (GIT_DESCRIBE_RESULT EQUAL 0)
-  set (VERSION "${GIT_DESCRIBE_OUTPUT}")
-  string (REGEX REPLACE "^[^0-9]+" "" VERSION "${VERSION}")
-  string (REGEX REPLACE "^1_"      "" VERSION "${VERSION}")
-  string (REGEX REPLACE "^[_vV]+"  "" VERSION "${VERSION}")
-  string (REGEX REPLACE "-g"   "git." VERSION "${VERSION}")
-  string (REGEX REPLACE "[_|-]"   "." VERSION "${VERSION}")
+  set (GIT_VERSION "${GIT_DESCRIBE_OUTPUT}")
+  string (REGEX REPLACE "^[^0-9]+" "" GIT_VERSION "${GIT_VERSION}")
+  string (REGEX REPLACE "^1_"      "" GIT_VERSION "${GIT_VERSION}")
+  string (REGEX REPLACE "^[_vV]+"  "" GIT_VERSION "${GIT_VERSION}")
+  string (REGEX REPLACE "-g"   "git." GIT_VERSION "${GIT_VERSION}")
+  string (REGEX REPLACE "[_|-]"   "." GIT_VERSION "${GIT_VERSION}")
   execute_process (
     COMMAND git rev-parse --abbrev-ref HEAD
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
     OUTPUT_VARIABLE GIT_REVPARSE_OUTPUT
     RESULT_VARIABLE GIT_REVPARSE_RESULT
     OUTPUT_STRIP_TRAILING_WHITESPACE)
-  if (GIT_REVPARSE_RESULT EQUAL 0 AND NOT GIT_REVPARSE_OUTPUT STREQUAL "master")
-    set (VERSION "${VERSION} [${GIT_REVPARSE_OUTPUT}]")
+  if (GIT_REVPARSE_RESULT EQUAL 0 AND NOT GIT_REVPARSE_OUTPUT STREQUAL "main")
+    set (GIT_VERSION "${GIT_VERSION} [${GIT_REVPARSE_OUTPUT}]")
   endif ()
-else ()
-  set (VERSION "${PROJECT_VERSION}")
+  set (PROJECT_VERSION "${GIT_VERSION}")
 endif ()
 
-set (PACKAGE_NAME "Qsynth")
-set (PACKAGE_VERSION "${VERSION}")
-set (PACKAGE_BUGREPORT "rncbc@rncbc.org")
-set (PACKAGE_STRING "${PACKAGE_NAME} ${PACKAGE_VERSION}")
-set (PACKAGE_TARNAME "qsynth")
 
-set (CONFIG_BUILD_VERSION "${PACKAGE_VERSION}")
-
-if (CONFIG_DEBUG)
-  set (CMAKE_BUILD_TYPE "Debug")
-endif ()
 if (CMAKE_BUILD_TYPE MATCHES "Debug")
   set (CONFIG_DEBUG 1)
-endif ()
-if (CONFIG_DEBUG)
   set (CONFIG_BUILD_TYPE "debug")
 else ()
+  set (CONFIG_DEBUG 0)
   set (CONFIG_BUILD_TYPE "release")
+  set (CMAKE_BUILD_TYPE "Release")
 endif ()
 
 set (CONFIG_PREFIX "${CMAKE_INSTALL_PREFIX}")
@@ -59,7 +54,7 @@ set (CONFIG_PREFIX "${CMAKE_INSTALL_PREFIX}")
 include (GNUInstallDirs)
 set (CONFIG_BINDIR  "${CONFIG_PREFIX}/${CMAKE_INSTALL_BINDIR}")
 set (CONFIG_LIBDIR  "${CONFIG_PREFIX}/${CMAKE_INSTALL_LIBDIR}")
-set (CONFIG_DATADIR "/${CMAKE_INSTALL_DATADIR}")
+set (CONFIG_DATADIR "${CONFIG_PREFIX}/${CMAKE_INSTALL_DATADIR}")
 set (CONFIG_MANDIR  "${CONFIG_PREFIX}/${CMAKE_INSTALL_MANDIR}")
 
 
@@ -74,6 +69,9 @@ option (CONFIG_FLUID_MIDI_ROUTER "Enable FluidSynth MIDI router support (DEPRECA
 
 # Enable new_fluid_server function.
 option (CONFIG_FLUID_SERVER "Enable FluidSynth server (default=yes)" 1)
+
+# Enable PipwWire support.
+option (CONFIG_PIPEWIRE "Enable PipeWire support (default=yes)" 1)
 
 # Enable unique/single instance.
 option (CONFIG_XUNIQUE "Enable unique/single instance (default=yes)" 1)
@@ -219,6 +217,14 @@ else ()
 endif ()
 
 
+if (CONFIG_PIPEWIRE)
+  pkg_check_modules (PIPEWIRE IMPORTED_TARGET libpipewire-0.3)
+  if (NOT PIPEWIRE_FOUND)
+    set (CONFIG_PIPEWIRE 0)
+  endif ()
+endif ()
+
+
 add_subdirectory (src)
 
 
@@ -231,8 +237,7 @@ macro (SHOW_OPTION text value)
   endif ()
 endmacro ()
 
-
-message   ("\n  ${PACKAGE_NAME} ${PACKAGE_VERSION} (Qt ${QT_VERSION})")
+message   ("\n  ${PROJECT_TITLE} ${PROJECT_VERSION} (Qt ${QT_VERSION})")
 message   ("\n  Build target . . . . . . . . . . . . . . . . . . .: ${CONFIG_BUILD_TYPE}\n")
 show_option ("  FluidSynth library support . . . . . . . . . . . ." CONFIG_FLUIDSYNTH)
 show_option ("  FluidSynth server support  . . . . . . . . . . . ." CONFIG_FLUID_SERVER)
@@ -242,6 +247,8 @@ show_option ("  FluidSynth channel info support (DEPRECATED) . . ." CONFIG_FLUID
 show_option ("  FluidSynth MIDI router support  (DEPRECATED) . . ." CONFIG_FLUID_MIDI_ROUTER)
 show_option ("  FluidSynth unset program support . . . . . . . . ." CONFIG_FLUID_UNSET_PROGRAM)
 show_option ("  FluidSynth version string support  . . . . . . . ." CONFIG_FLUID_VERSION_STR)
+message     ("")
+show_option ("  PipeWire (pw-init) support . . . . . . . . . . . ." CONFIG_PIPEWIRE)
 message     ("")
 show_option ("  System tray icon support . . . . . . . . . . . . ." CONFIG_SYSTEM_TRAY)
 message     ("")

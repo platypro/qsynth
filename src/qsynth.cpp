@@ -1,7 +1,7 @@
 // qsynth.cpp
 //
 /****************************************************************************
-   Copyright (C) 2003-2022, rncbc aka Rui Nuno Capela. All rights reserved.
+   Copyright (C) 2003-2024, rncbc aka Rui Nuno Capela. All rights reserved.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -35,6 +35,11 @@
 #include <QLocale>
 
 #include <QSessionManager>
+
+#ifdef CONFIG_PIPEWIRE
+#include <pipewire/pipewire.h>
+#endif
+
 
 #if QT_VERSION < QT_VERSION_CHECK(4, 5, 0)
 namespace Qt {
@@ -77,10 +82,10 @@ const WindowFlags WindowCloseButtonHint = WindowFlags(0x08000000);
 
 #ifdef CONFIG_XUNIQUE
 
-#define QSYNTH_XUNIQUE "qsynthApplication"
-
 #if QT_VERSION < QT_VERSION_CHECK(5, 0, 0)
 #ifdef CONFIG_X11
+
+#define QSYNTH_XUNIQUE "qsynthApplication"
 
 #include <unistd.h> /* for gethostname() */
 
@@ -90,6 +95,9 @@ const WindowFlags WindowCloseButtonHint = WindowFlags(0x08000000);
 #endif	// CONFIG_X11
 #else
 #include <QSharedMemory>
+#if QT_VERSION >= QT_VERSION_CHECK(6, 6, 0)
+#include <QNativeIpcKey>
+#endif
 #include <QLocalServer>
 #include <QLocalSocket>
 #include <QHostInfo>
@@ -107,6 +115,18 @@ QString qsynthApplication::translationsPath;
 qsynthApplication::qsynthApplication ( int& argc, char **argv )
 	: QApplication(argc, argv),
 		m_pQtTranslator(nullptr), m_pMyTranslator(nullptr), m_pWidget(nullptr)
+#ifdef CONFIG_XUNIQUE
+#if QT_VERSION < QT_VERSION_CHECK(5, 0, 0)
+#ifdef CONFIG_X11
+	, m_pDisplay(nullptr)
+	, m_aUnique(0)
+	, m_wOwner(0)
+#endif	// CONFIG_X11
+#else
+	, m_pMemory(nullptr)
+	, m_pServer(nullptr)
+#endif
+#endif	// CONFIG_XUNIQUE
 {
 #if QT_VERSION >= QT_VERSION_CHECK(5, 1, 0)
 	QApplication::setApplicationName(QSYNTH_TITLE);
@@ -114,9 +134,9 @@ qsynthApplication::qsynthApplication ( int& argc, char **argv )
 	//	QSYNTH_TITLE " - " + QObject::tr(QSYNTH_SUBTITLE));
 #if QT_VERSION >= QT_VERSION_CHECK(5, 7, 0)
 	QApplication::setDesktopFileName(
-		QString("org.rncbc.%1").arg(PACKAGE_TARNAME));
+		QString("org.rncbc.%1").arg(PROJECT_NAME));
 #endif
-	QString sVersion(CONFIG_BUILD_VERSION);
+	QString sVersion(PROJECT_VERSION);
 	sVersion += '\n';
 	sVersion += QString("Qt: %1").arg(qVersion());
 #if defined(QT_STATIC)
@@ -133,19 +153,6 @@ qsynthApplication::qsynthApplication ( int& argc, char **argv )
 	appDir.cdUp();
 #endif
 	qsynthApplication::prefixPath = appDir.path();
-
-#ifdef CONFIG_XUNIQUE
-#if QT_VERSION < QT_VERSION_CHECK(5, 0, 0)
-#ifdef CONFIG_X11
-	m_pDisplay = nullptr;
-	m_aUnique = 0;
-	m_wOwner = 0;
-#endif	// CONFIG_X11
-#else
-	m_pMemory = nullptr;
-	m_pServer = nullptr;
-#endif
-#endif	// CONFIG_XUNIQUE
 }
 
 
@@ -154,15 +161,7 @@ qsynthApplication::~qsynthApplication (void)
 {
 #ifdef CONFIG_XUNIQUE
 #if QT_VERSION >= QT_VERSION_CHECK(5, 0, 0)
-	if (m_pServer) {
-		m_pServer->close();
-		delete m_pServer;
-		m_pServer = nullptr;
-	}
-	if (m_pMemory) {
-		delete m_pMemory;
-		m_pMemory = nullptr;
-}
+	clearServer();
 #endif
 #endif	// CONFIG_XUNIQUE
 	if (m_pMyTranslator) delete m_pMyTranslator;
@@ -317,62 +316,7 @@ bool qsynthApplication::setup (void)
 #endif	// CONFIG_X11
 	return false;
 #else
-	m_sUnique = QCoreApplication::applicationName();
-	QString sUserName = QString::fromUtf8(::getenv("USER"));
-	if (sUserName.isEmpty())
-		sUserName = QString::fromUtf8(::getenv("USERNAME"));
-	if (!sUserName.isEmpty()) {
-		m_sUnique += ':';
-		m_sUnique += sUserName;
-	}
-	m_sUnique += '@';
-	m_sUnique += QHostInfo::localHostName();
-#ifdef Q_OS_UNIX
-	m_pMemory = new QSharedMemory(m_sUnique);
-	m_pMemory->attach();
-	delete m_pMemory;
-#endif
-	m_pMemory = new QSharedMemory(m_sUnique);
-	bool bServer = false;
-	const qint64 pid = QCoreApplication::applicationPid();
-	struct Data { qint64 pid; };
-	if (m_pMemory->create(sizeof(Data))) {
-		m_pMemory->lock();
-		Data *pData = static_cast<Data *> (m_pMemory->data());
-		if (pData) {
-			pData->pid = pid;
-			bServer = true;
-		}
-		m_pMemory->unlock();
-	}
-	else
-	if (m_pMemory->attach()) {
-		m_pMemory->lock(); // maybe not necessary?
-		Data *pData = static_cast<Data *> (m_pMemory->data());
-		if (pData)
-			bServer = (pData->pid == pid);
-		m_pMemory->unlock();
-	}
-	if (bServer) {
-		QLocalServer::removeServer(m_sUnique);
-		m_pServer = new QLocalServer();
-		m_pServer->setSocketOptions(QLocalServer::UserAccessOption);
-		m_pServer->listen(m_sUnique);
-		QObject::connect(m_pServer,
-			SIGNAL(newConnection()),
-			SLOT(newConnectionSlot()));
-	} else {
-		QLocalSocket socket;
-		socket.connectToServer(m_sUnique);
-		if (socket.state() == QLocalSocket::ConnectingState)
-			socket.waitForConnected(200);
-		if (socket.state() == QLocalSocket::ConnectedState) {
-			socket.write(QCoreApplication::arguments().join(' ').toUtf8());
-			socket.flush();
-			socket.waitForBytesWritten(200);
-		}
-	}
-	return !bServer;
+	return setupServer();
 #endif
 #else
 	return false;
@@ -409,7 +353,7 @@ void qsynthApplication::x11PropertyNotify ( Window w )
 			// Avoid repeating it-self...
 			XDeleteProperty(m_pDisplay, m_wOwner, m_aUnique);
 			// Just make it always shows up fine...
-			m_pWidget->show();
+			m_pWidget->showNormal();
 			m_pWidget->raise();
 			m_pWidget->activateWindow();
 			// FIXME: Do our best speciality, although it should be
@@ -435,6 +379,102 @@ bool qsynthApplication::x11EventFilter ( XEvent *pEv )
 #endif	// CONFIG_X11
 #else
 
+// Local server/shmem setup.
+bool qsynthApplication::setupServer (void)
+{
+	clearServer();
+
+	m_sUnique = QCoreApplication::applicationName();
+	QString sUserName = QString::fromUtf8(::getenv("USER"));
+	if (sUserName.isEmpty())
+		sUserName = QString::fromUtf8(::getenv("USERNAME"));
+	if (!sUserName.isEmpty()) {
+		m_sUnique += ':';
+		m_sUnique += sUserName;
+	}
+	m_sUnique += '@';
+	m_sUnique += QHostInfo::localHostName();
+#if QT_VERSION >= QT_VERSION_CHECK(6, 6, 0)
+	const QNativeIpcKey nativeKey
+		= QSharedMemory::legacyNativeKey(m_sUnique);
+#if defined(Q_OS_UNIX)
+	m_pMemory = new QSharedMemory(nativeKey);
+	m_pMemory->attach();
+	delete m_pMemory;
+#endif
+	m_pMemory = new QSharedMemory(nativeKey);
+#else
+#if defined(Q_OS_UNIX)
+	m_pMemory = new QSharedMemory(m_sUnique);
+	m_pMemory->attach();
+	delete m_pMemory;
+#endif
+	m_pMemory = new QSharedMemory(m_sUnique);
+#endif
+
+	bool bServer = false;
+	const qint64 pid = QCoreApplication::applicationPid();
+	struct Data { qint64 pid; };
+	if (m_pMemory->create(sizeof(Data))) {
+		m_pMemory->lock();
+		Data *pData = static_cast<Data *> (m_pMemory->data());
+		if (pData) {
+			pData->pid = pid;
+			bServer = true;
+		}
+		m_pMemory->unlock();
+	}
+	else
+	if (m_pMemory->attach()) {
+		m_pMemory->lock(); // maybe not necessary?
+		Data *pData = static_cast<Data *> (m_pMemory->data());
+		if (pData)
+			bServer = (pData->pid == pid);
+		m_pMemory->unlock();
+	}
+
+	if (bServer) {
+		QLocalServer::removeServer(m_sUnique);
+		m_pServer = new QLocalServer();
+		m_pServer->setSocketOptions(QLocalServer::UserAccessOption);
+		m_pServer->listen(m_sUnique);
+		QObject::connect(m_pServer,
+			 SIGNAL(newConnection()),
+			 SLOT(newConnectionSlot()));
+	} else {
+		QLocalSocket socket;
+		socket.connectToServer(m_sUnique);
+		if (socket.state() == QLocalSocket::ConnectingState)
+			socket.waitForConnected(200);
+		if (socket.state() == QLocalSocket::ConnectedState) {
+			socket.write(QCoreApplication::arguments().join(' ').toUtf8());
+			socket.flush();
+			socket.waitForBytesWritten(200);
+		}
+	}
+
+	return !bServer;
+}
+
+
+// Local server/shmem cleanup.
+void qsynthApplication::clearServer (void)
+{
+	if (m_pServer) {
+		m_pServer->close();
+		delete m_pServer;
+		m_pServer = nullptr;
+	}
+
+	if (m_pMemory) {
+		delete m_pMemory;
+		m_pMemory = nullptr;
+	}
+
+	m_sUnique.clear();
+}
+
+
 // Local server conection slot.
 void qsynthApplication::newConnectionSlot (void)
 {
@@ -453,15 +493,18 @@ void qsynthApplication::readyReadSlot (void)
 		if (nread > 0) {
 			const QByteArray data = pSocket->read(nread);
 			// Just make it always shows up fine...
-			m_pWidget->hide();
-			m_pWidget->show();
-			m_pWidget->raise();
-			m_pWidget->activateWindow();
+			if (m_pWidget) {
+				m_pWidget->showNormal();
+				m_pWidget->raise();
+				m_pWidget->activateWindow();
+			}
 			// FIXME: Do our best speciality, although it should be
 			// done iif configuration says so, we'll do it anyway!
 			qsynthMainForm *pMainForm = qsynthMainForm::getInstance();
 			if (pMainForm)
 				pMainForm->startAllEngines();
+			// Reset the server...
+			setupServer();
 		}
 	}
 }
@@ -534,6 +577,12 @@ void stacktrace ( int signo )
 
 int main ( int argc, char **argv )
 {
+#ifdef CONFIG_PIPEWIRE
+	// Initialize PipeWire first
+	::pw_init(&argc, &argv);
+	::atexit(::pw_deinit);
+#endif
+
 	Q_INIT_RESOURCE(qsynth);
 #ifdef CONFIG_STACKTRACE
 #if defined(Q_CC_GNU) && defined(Q_OS_LINUX)
@@ -576,6 +625,29 @@ int main ( int argc, char **argv )
 		app.setStyle(QStyleFactory::create(options.sCustomStyleTheme));
 
 	// Custom color theme (eg. "KXStudio")...
+	const QChar sep = QDir::separator();
+	QString sPalettePath = QApplication::applicationDirPath();
+	sPalettePath.remove(CONFIG_BINDIR);
+	sPalettePath.append(CONFIG_DATADIR);
+	sPalettePath.append(sep);
+	sPalettePath.append(PROJECT_NAME);
+	sPalettePath.append(sep);
+	sPalettePath.append("palette");
+	if (QDir(sPalettePath).exists()) {
+		QStringList names;
+		names.append("KXStudio");
+		names.append("Wonton Soup");
+		QStringListIterator name_iter(names);
+		while (name_iter.hasNext()) {
+			const QString& name = name_iter.next();
+			const QFileInfo fi(sPalettePath, name + ".conf");
+			if (fi.isReadable()) {
+				qsynthPaletteForm::addNamedPaletteConf(
+					&options.settings(), name, fi.absoluteFilePath());
+			}
+		}
+	}
+
 	QPalette pal(app.palette());
 	if (qsynthPaletteForm::namedPalette(
 			&options.settings(), options.sCustomColorTheme, pal))

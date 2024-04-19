@@ -67,18 +67,24 @@ set (RESOURCES
 )
 
 set ( TRANSLATIONS
-   translations/qsynth_cs.ts
-   translations/qsynth_de.ts
-   translations/qsynth_es.ts
-   translations/qsynth_fr.ts
-   translations/qsynth_ru.ts
-   translations/qsynth_sr.ts
+  translations/qsynth_cs.ts
+  translations/qsynth_de.ts
+  translations/qsynth_es.ts
+  translations/qsynth_fr.ts
+  translations/qsynth_ru.ts
+  translations/qsynth_sr.ts
+)
+
+add_custom_target (update_translations
+  COMMAND Qt${QT_VERSION_MAJOR}::lupdate -recursive ${CMAKE_CURRENT_SOURCE_DIR} -ts ${TRANSLATIONS}
+  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+  COMMENT "Updating translations..."
 )
 
 if (QT_VERSION VERSION_LESS 5.15.0)
-    qt5_add_translation (QM_FILES ${TRANSLATIONS})
+  qt5_add_translation (QM_FILES ${TRANSLATIONS})
 else()
-    qt_add_translation (QM_FILES ${TRANSLATIONS})
+  qt_add_translation (QM_FILES ${TRANSLATIONS})
 endif()
 
 add_custom_target (translations ALL DEPENDS ${QM_FILES})
@@ -91,10 +97,10 @@ if (WIN32)
   set (RC_FILE ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}.rc)
   set (RES_FILE ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}.res.obj)
   if (MINGW)
-	get_filename_component (compiler_location "${CMAKE_CXX_COMPILER}" DIRECTORY)
+    get_filename_component (compiler_location "${CMAKE_CXX_COMPILER}" DIRECTORY)
     find_program (WINDRES_EXECUTABLE NAMES windres mingw32-windres i686-mingw32-windres PATHS ${compiler_location} NO_DEFAULT_PATH)
     execute_process (COMMAND ${WINDRES_EXECUTABLE} -i ${RC_FILE} -o ${RES_FILE} --include-dir=${CMAKE_CURRENT_SOURCE_DIR}/images/
-		WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+                     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
     list (APPEND SOURCES ${RES_FILE})
   else ()
     list (APPEND SOURCES ${RC_FILE})
@@ -140,14 +146,14 @@ endif ()
 if (APPLE)
   set_target_properties (${PROJECT_NAME} PROPERTIES
     MACOSX_BUNDLE true
-    MACOSX_BUNDLE_GUI_IDENTIFIER "org.rncbc.qsynth"
-    MACOSX_BUNDLE_BUNDLE_NAME "${PACKAGE_NAME}"
-    MACOSX_BUNDLE_DISPLAY_NAME "${PACKAGE_NAME}"
-    MACOSX_BUNDLE_INFO_STRING "A fluidsynth Qt GUI Interface"
-    MACOSX_BUNDLE_LONG_VERSION_STRING "${VERSION}"
-    MACOSX_BUNDLE_SHORT_VERSION_STRING "${CONFIG_VERSION}"
-    MACOSX_BUNDLE_BUNDLE_VERSION "${CONFIG_VERSION}"
-    MACOSX_BUNDLE_COPYRIGHT "Copyright © 2003-2021, Rui Nuno Capela. All rights reserved.")
+    MACOSX_BUNDLE_GUI_IDENTIFIER "org.rncbc.${PROJECT_NAME}"
+    MACOSX_BUNDLE_BUNDLE_NAME "${PROJECT_NAME}"
+    MACOSX_BUNDLE_DISPLAY_NAME "${PROJECT_NAME}"
+    MACOSX_BUNDLE_INFO_STRING "${PROJECT_DESCRIPTION}"
+    MACOSX_BUNDLE_LONG_VERSION_STRING "${PROJECT_VERSION}"
+    MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
+    MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_VERSION}"
+    MACOSX_BUNDLE_COPYRIGHT "Copyright © 2003-2024, Rui Nuno Capela. All rights reserved.")
 endif ()
 
 target_link_libraries (${PROJECT_NAME} PRIVATE Qt${QT_VERSION_MAJOR}::Widgets Qt${QT_VERSION_MAJOR}::Svg)
@@ -162,6 +168,10 @@ endif ()
 
 if (CONFIG_ROUND)
   target_link_libraries (${PROJECT_NAME} PRIVATE ${MATH_LIBRARY})
+endif ()
+
+if (CONFIG_PIPEWIRE)
+  target_link_libraries (${PROJECT_NAME} PRIVATE PkgConfig::PIPEWIRE)
 endif ()
 
 
@@ -184,6 +194,8 @@ if (UNIX AND NOT APPLE)
     DESTINATION ${CMAKE_INSTALL_MANDIR}/man1)
   install (FILES man1/${PROJECT_NAME}.fr.1
     DESTINATION ${CMAKE_INSTALL_MANDIR}/fr/man1 RENAME ${PROJECT_NAME}.1)
+  install (FILES palette/KXStudio.conf palette/Wonton\ Soup.conf
+    DESTINATION ${CMAKE_INSTALL_DATADIR}/${PROJECT_NAME}/palette)
 endif ()
 
 if (WIN32)

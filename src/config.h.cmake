@@ -1,26 +1,27 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
-/* Define to the full name of this package. */
-#cmakedefine PACKAGE_NAME "@PACKAGE_NAME@"
+/* Define to the title of this package. */
+#cmakedefine PROJECT_TITLE "@PROJECT_TITLE@"
 
-/* Define to the full name and version of this package. */
-#cmakedefine PACKAGE_STRING "@PACKAGE_STRING@"
-
-/* Define to the version of this package. */
-#cmakedefine PACKAGE_VERSION "@PACKAGE_VERSION@"
-
-/* Define to the address where bug reports for this package should be sent. */
-#cmakedefine PACKAGE_BUGREPORT "@PACKAGE_BUGREPORT@"
-
-/* Define to the one symbol short name of this package. */
-#cmakedefine PACKAGE_TARNAME "@PACKAGE_TARNAME@"
+/* Define to the name of this package. */
+#cmakedefine PROJECT_NAME "@PROJECT_NAME@"
 
 /* Define to the version of this package. */
-#cmakedefine CONFIG_VERSION "@CONFIG_VERSION@"
+#cmakedefine PROJECT_VERSION "@PROJECT_VERSION@"
 
-/* Define to the build version of this package. */
-#cmakedefine CONFIG_BUILD_VERSION "@CONFIG_BUILD_VERSION@"
+/* Define to the description of this package. */
+#cmakedefine PROJECT_DESCRIPTION "@PROJECT_DESCRIPTION@"
+
+/* Define to the homepage of this package. */
+#cmakedefine PROJECT_HOMEPAGE_URL "@PROJECT_HOMEPAGE_URL@"
+
+/* Define to the copyright of this package. */
+#cmakedefine PROJECT_COPYRIGHT "@PROJECT_COPYRIGHT@"
+
+/* Define to the domain of this package. */
+#cmakedefine PROJECT_DOMAIN "@PROJECT_DOMAIN@"
+
 
 /* Default installation prefix. */
 #cmakedefine CONFIG_PREFIX "@CONFIG_PREFIX@"
@@ -40,7 +41,7 @@
 /* Define if lroundf is available. */
 #cmakedefine CONFIG_ROUND @CONFIG_ROUND@
 
-/* Define if X11 Unique/Single instance is enabled. */
+/* Define if Unique/Single instance is enabled. */
 #cmakedefine CONFIG_XUNIQUE @CONFIG_XUNIQUE@
 
 /* Define if gradient eye-candy is enabled. */
@@ -127,7 +128,11 @@
 /* Define if fluid_free function is available. */
 #cmakedefine CONFIG_FLUID_FREE @CONFIG_FLUID_FREE@
 
+/* Define if PipeWire is supported. */
+#cmakedefine CONFIG_PIPEWIRE @CONFIG_PIPEWIRE@
+
 /* Define if Wayland is supported */
 #cmakedefine CONFIG_WAYLAND @CONFIG_WAYLAND@
+
 
 #endif /* CONFIG_H */
