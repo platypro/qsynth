@@ -1,7 +1,7 @@
 // qsynthOptions.cpp
 //
 /****************************************************************************
-   Copyright (C) 2003-2024, rncbc aka Rui Nuno Capela. All rights reserved.
+   Copyright (C) 2003-2025, rncbc aka Rui Nuno Capela. All rights reserved.
 
    This program is free software; you can redistribute it and/or
    modify it under the terms of the GNU General Public License
@@ -317,15 +317,39 @@ bool qsynthOptions::parse_args ( const QStringList& args )
 		QObject::tr("Dump midi router events")});
 	parser.addOption({{"V", "verbose"},
 		QObject::tr("Print out verbose messages about midi events")});
-	parser.addHelpOption();
-	parser.addVersionOption();
+	const QCommandLineOption& helpOption = parser.addHelpOption();
+	const QCommandLineOption& versionOption = parser.addVersionOption();
 	parser.addPositionalArgument("soundfonts",
 		QObject::tr("SoundFont Files"),
 		QObject::tr("[soundfonts]"));
 	parser.addPositionalArgument("midifiles",
 		QObject::tr("MIDI Files"),
 		QObject::tr("[midifiles]"));
-	parser.process(args);
+
+	if (!parser.parse(args)) {
+		show_error(parser.errorText());
+		return false;
+	}
+
+	if (parser.isSet(helpOption)) {
+		show_error(parser.helpText());
+		return false;
+	}
+
+	if (parser.isSet(versionOption)) {
+		QString sVersion = QString("%1 %2\n")
+			.arg(QSYNTH_TITLE)
+			.arg(QCoreApplication::applicationVersion());
+		sVersion += QString("Qt: %1").arg(qVersion());
+	#if defined(QT_STATIC)
+		sVersion += "-static";
+	#endif
+		sVersion += '\n';
+		sVersion += QString("FluidSynth: %1\n")
+			.arg(::fluid_version_str());
+		show_error(sVersion);
+		return false;
+	}
 
 	if (parser.isSet("no-midi-in")) {
 		m_pDefaultSetup->bMidiIn = false;
@@ -634,6 +658,9 @@ bool qsynthOptions::parse_args ( const QStringList& args )
 			return false;
 		}
 		else if (sArg == "-v" || sArg == "--version") {
+			out << QString("%1: %2\n")
+				.arg(QSYNTH_TITLE)
+				.arg(QCoreApplication::applicationVersion()));
 			out << QString("Qt: %1").arg(qVersion());
 		#if defined(QT_STATIC)
 			out << "-static";
@@ -641,9 +668,6 @@ bool qsynthOptions::parse_args ( const QStringList& args )
 			out << '\n';
 			out << QString("FluidSynth: %1\n")
 				.arg(::fluid_version_str());
-			out << QString("%1: %2\n")
-				.arg(QSYNTH_TITLE)
-				.arg(PROJECT_VERSION);
 			return false;
 		}
 		else {
@@ -809,6 +833,14 @@ void qsynthOptions::loadSetup ( qsynthSetup *pSetup, const QString& sName )
 	pSetup->bServer          = m_settings.value("/Server", false).toBool();
 	pSetup->bMidiDump        = m_settings.value("/MidiDump", false).toBool();
 	pSetup->bVerbose         = m_settings.value("/Verbose", false).toBool();
+	m_settings.beginGroup("/Custom");
+	QStringListIterator keys_iter(m_settings.childKeys());
+	while (keys_iter.hasNext()) {
+		const QString& sKey = keys_iter.next();
+		const QString& sVal = m_settings.value("/" + sKey).toString();
+		pSetup->settings.insert(sKey, sVal);
+	}
+	m_settings.endGroup();
 	m_settings.endGroup();
 
 	// Load soundfont list...
@@ -889,7 +921,7 @@ void qsynthOptions::saveSetup ( qsynthSetup *pSetup, const QString& sName )
 	}
 	m_settings.endGroup();
 
-	// Save last fluidsynth m_settings.
+	// Save last fluidsynth settings.
 	m_settings.beginGroup("/Settings");
 	m_settings.setValue("/DisplayName",      pSetup->sDisplayName);
 	m_settings.setValue("/MidiIn",           pSetup->bMidiIn);
@@ -928,7 +960,17 @@ void qsynthOptions::saveSetup ( qsynthSetup *pSetup, const QString& sName )
 	m_settings.setValue("/Server",           pSetup->bServer);
 	m_settings.setValue("/MidiDump",         pSetup->bMidiDump);
 	m_settings.setValue("/Verbose",          pSetup->bVerbose);
+	m_settings.beginGroup("/Custom");
+	m_settings.remove(QString());
+	qsynthSetup::Settings::ConstIterator iter2
+		= pSetup->settings.constBegin();
+	const qsynthSetup::Settings::ConstIterator& iter2_end
+		= pSetup->settings.constEnd();
+	for ( ; iter2 != iter2_end; ++iter2)
+		m_settings.setValue("/" + iter2.key(), iter2.value());
 	m_settings.endGroup();
+	m_settings.endGroup();
+
 
 	// Done with the key group?
 	if (!sName.isEmpty())
